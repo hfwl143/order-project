@@ -1,6 +1,6 @@
 # 后端 backend
+**/__pycache__/
 backend/.venv/
-backend/__pycache__/
 backend/*.pyc
 backend/*.pyo
 backend/*.pyd
