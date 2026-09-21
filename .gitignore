@@ -1,0 +1,25 @@
+# 后端 backend
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.env
+backend/*.log
+
+# 前端 frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr
+frontend/*.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# IDE / 插件缓存
+.codegraph/
+.omo/
+.idea/
+.vscode/
+*.swp
+*.swo

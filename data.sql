@@ -1,0 +1,9 @@
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    hashed_password VARCHAR(200) NOT NULL
+) CHARSET = utf8mb4;
+
+ALTER TABLE tasks ADD COLUMN owner_id INT;
+
+ALTER TABLE tasks ADD FOREIGN KEY (owner_id) REFERENCES users (id);
