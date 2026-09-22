@@ -8,7 +8,6 @@ import crud
 import schemas
 from auth import create_token,get_current_user
 from router.auth import router as auth_router
-from router.tasks import router as tasks_router
 # 生命周期管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,5 +45,5 @@ def health():
 
 
 app.include_router(auth_router)
-app.include_router(tasks_router)
+
 app.include_router(router)
