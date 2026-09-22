@@ -4,6 +4,8 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str
     token_expire_minutes: int
+    database_url: str
+
 
     model_config = SettingsConfigDict(env_file=".env")
 

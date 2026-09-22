@@ -1,7 +1,8 @@
 from sqlalchemy import create_engine#引擎函数
 from sqlalchemy.orm import sessionmaker, DeclarativeBase# 导入SQLAlchemy ORM相关的sessionmaker和DeclarativeBase类
+from config import settings
 
-DATABASE_URL = "mysql+pymysql://root:hfwl1346@localhost:3306/task_db?charset=utf8mb4"
+DATABASE_URL = settings.database_url
 
 engine = create_engine(DATABASE_URL,pool_pre_ping=True) #  创建数据库引擎，并启用pool_pre_ping选项用于自动检测断开连接
 SessionLocal = sessionmaker(bind=engine,autoflush=False) #  创建会话工厂，绑定到数据库引擎，并禁用自动刷新功能
