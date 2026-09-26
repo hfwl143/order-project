@@ -1,6 +1,24 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date, datetime
+from enum import Enum
+
+class OrderTag(str, Enum):
+    编程 = "编程"
+    PS设计 = "PS设计"
+    绘图 = "绘图"
+    文案 = "文案"
+
+class OrderCreate(BaseModel):
+    title: str
+    description: str
+    tag: OrderTag
+    deadline: str | None = None
+
+class ProfileUpdate(BaseModel):
+    wechat: str | None = None
+    phone: str | None = None
+
 
 class UserCreate(BaseModel):
     username: str
