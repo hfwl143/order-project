@@ -1,454 +1,201 @@
 <template>
-  <div class="tasks">
-    <h1 class="page-title">📝 我的待办</h1>
-
-    <!-- 筛选栏 -->
-    <div class="filter-bar">
-      <el-button
-        v-for="f in filters"
-        :key="String(f.value)"
-        :type="currentFilter === f.value ? 'primary' : 'default'"
-        @click="switchFilter(f.value)"
-      >
-        {{ f.label }}
-      </el-button>
+  <section class="page-shell">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">YOUR WORK / 订单管理</p>
+        <h1>我的订单</h1>
+        <p class="page-lede">跟进你发起的需求，以及正在合作的订单。</p>
+      </div>
+      <router-link class="text-link" to="/">浏览订单大厅 <span aria-hidden="true">→</span></router-link>
     </div>
 
-    <!-- 添加任务栏 -->
-    <div class="add-bar">
-      <el-input
-        v-model="newTitle"
-        placeholder="任务标题，回车添加"
-        @keyup.enter="addTask"
-        clearable
-      />
-      <el-date-picker
-        v-model="newDue"
-        type="date"
-        placeholder="截止日期（可选）"
-        format="YYYY-MM-DD"
-        value-format="YYYY-MM-DD"
-        style="width: 160px"
-      />
-      <el-input
-        v-model="newDesc"
-        placeholder="描述（可选）"
-        @keyup.enter="addTask"
-        clearable
-      />
-      <el-button type="primary" @click="addTask">添加</el-button>
+    <div class="mine-toolbar">
+      <div class="role-switch" role="tablist" aria-label="订单身份">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="role-tab"
+          :class="{ active: role === tab.value }"
+          role="tab"
+          :aria-selected="role === tab.value"
+          @click="role = tab.value"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+      <span class="result-count">{{ orders.length }} 个订单</span>
     </div>
 
-    <!-- 任务列表 -->
-    <TransitionGroup name="task-list" tag="ul">
-      <li v-for="task in tasks" :key="task.id" :class="{ done: task.completed }">
-        <div class="row">
-          <el-checkbox
-            :model-value="task.completed"
-            @change="toggleTask(task)"
-          />
-          <span class="title" @click="startEdit(task)">
-            {{ task.title }}
-            <el-tag v-if="task.due_date" type="warning" size="small" effect="plain">
-              📅 {{ task.due_date }}
-            </el-tag>
-          </span>
-          <el-button type="danger" text @click="removeTask(task)">删除</el-button>
-        </div>
-        <!-- 编辑区 -->
-        <div v-if="editingId === task.id" class="edit-box">
-          <el-input v-model="editForm.title" placeholder="标题" />
-          <el-input
-            v-model="editForm.description"
-            type="textarea"
-            placeholder="描述（可选）"
-            :rows="3"
-          />
-          <el-date-picker
-            v-model="editForm.due_date"
-            type="date"
-            placeholder="截止日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-          <div class="edit-actions">
-            <el-button type="primary" @click="saveEdit(task)">保存</el-button>
-            <el-button @click="cancelEdit">取消</el-button>
+    <div v-if="loadingOrders" class="list-placeholder">正在加载订单…</div>
+    <div v-else-if="orders.length" class="order-list">
+      <article v-for="order in orders" :key="order.id" class="order-row mine-row">
+        <div class="order-main">
+          <div class="order-meta">
+            <span class="category-mark">{{ order.tag }}</span>
+            <span class="meta-separator">·</span>
+            <span>订单 #{{ order.id }}</span>
+            <span v-if="order.deadline" class="deadline">截止 {{ order.deadline }}</span>
           </div>
+          <h2>{{ order.title }}</h2>
+          <p class="order-description">{{ order.description }}</p>
+          <div class="mine-details">
+            <span>身份：{{ role === 'published' ? '发布者' : '接单者' }}</span>
+            <span v-if="order.taker_id">接单人 #{{ order.taker_id }}</span>
+            <span v-if="order.contact">
+              微信 {{ order.contact.wechat || '未填写' }} · 电话 {{ order.contact.phone || '未填写' }}
+            </span>
+          </div>
+          <p v-if="order.abandon_requested" class="request-note">
+            {{ role === 'published' ? '接单者申请放弃，等待你处理。' : '放弃申请已提交，等待发布者处理。' }}
+          </p>
         </div>
-      </li>
-    </TransitionGroup>
+        <div class="order-side">
+          <span class="status-pill" :class="statusClass(order.order_status)">{{ order.order_status }}</span>
+          <template v-if="role === 'published' && order.abandon_requested">
+            <el-button type="primary" @click="decide(order, 'agree')">同意放弃</el-button>
+            <el-button @click="decide(order, 'reject')">拒绝</el-button>
+          </template>
+          <template v-else-if="role === 'published' && order.order_status === '未接单'">
+            <el-button @click="openEdit(order)">编辑</el-button>
+            <el-button type="danger" plain @click="close(order)">关闭订单</el-button>
+          </template>
+          <el-button
+            v-else-if="role === 'taken' && order.order_status === '已接单' && !order.abandon_requested"
+            type="danger"
+            plain
+            @click="abandon(order)"
+          >申请放弃</el-button>
+        </div>
+      </article>
+    </div>
+    <div v-else class="empty-state">
+      <span class="empty-index">01</span>
+      <h2>{{ role === 'published' ? '还没有发布订单' : '还没有接取订单' }}</h2>
+      <p>{{ role === 'published' ? '把需要协作的事情发布出来，找到合适的人。' : '去订单大厅看看，或许有适合你的合作。' }}</p>
+      <router-link class="empty-link" to="/">前往订单大厅 <span aria-hidden="true">→</span></router-link>
+    </div>
 
-    <!-- 空状态 -->
-    <div v-if="tasks.length === 0" class="empty-state">
-      <div class="empty-icon">📋</div>
-      <div class="empty-title">暂无任务</div>
-      <div class="empty-desc">在上方输入框添加你的第一个任务吧～</div>
-    </div>
-    <div class="header">
-      <h1>我的待办</h1>
-      <button class="logout" @click="logout">退出</button>
-    </div>
-  </div>
+    <el-dialog v-model="editVisible" title="编辑订单" width="min(560px, calc(100vw - 32px))">
+      <el-form label-position="top" @submit.prevent="saveEdit">
+        <el-form-item label="订单标题" required>
+          <el-input v-model="editDraft.title" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="需求描述" required>
+          <el-input v-model="editDraft.description" type="textarea" :rows="4" />
+        </el-form-item>
+        <div class="form-pair">
+          <el-form-item label="技能分类" required>
+            <el-select v-model="editDraft.tag" class="full-width">
+              <el-option v-for="tag in tags" :key="tag" :label="tag" :value="tag" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="截止时间（可选）">
+            <el-input v-model="editDraft.deadline" type="datetime-local" />
+          </el-form-item>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!editDraft.title.trim() || !editDraft.description.trim()" @click="saveEdit">
+          保存修改
+        </el-button>
+      </template>
+    </el-dialog>
+  </section>
 </template>
 
 <script setup>
-// 引入响应式 ref 和生命周期钩子 onMounted
-import { ref, onMounted } from 'vue'
-// 引入后端接口：查询、创建、更新、删除任务的 API 函数
-import { getTasks, createTask, updateTask, deleteTask } from '../api/task'
-import { showToast, showLoading, hideLoading } from '../toast'
+import { onMounted, ref, watch } from 'vue'
+import {
+  closeOrder,
+  decideAbandon,
+  getMyOrders,
+  requestAbandon,
+  updateOrder,
+} from '../api/task'
+import { showToast } from '../toast'
 
-// 通用请求包装：自动 loading + 失败弹 toast
-async function request(fn, { loading = true, successMsg = '' } = {}) {
-  if (loading) showLoading()
-  try {
-    const res = await fn()
-    if (successMsg) showToast(successMsg, 'success')
-    return res
-  } catch (err) {
-    showToast(err.friendlyMessage || '操作失败')
-    throw err            // 继续抛出，方便调用方做特殊处理（可选）
-  } finally {
-    if (loading) hideLoading()
-  }
-}
-
-
-
-
-
-// 响应式状态：任务列表数组，初始为空
-const tasks = ref([])
-// 响应式状态：新增任务的标题输入值
-const newTitle = ref('')
-// 响应式状态：新增任务的截止日期输入值
-const newDue = ref('')
-// 响应式状态：当前选中的筛选值，默认 all
-const currentFilter = ref('all')
-// 响应式状态：新增任务的描述输入值
-const newDesc = ref('')
-
-// 筛选选项配置：名称与对应筛选值（value 可为字符串或布尔值）
-const filters = [
-  // 全部任务：筛选值为 'all'
-  { label: '全部', value: 'all' },
-  // 未完成任务：筛选值为 false
-  { label: '未完成', value: false },
-  // 已完成任务：筛选值为 true
-  { label: '已完成', value: true },
+const tabs = [
+  { label: '我发布的', value: 'published' },
+  { label: '我接取的', value: 'taken' },
 ]
-
-// ===== 编辑相关 =====
-// 响应式状态：当前正在编辑的任务 id，null 表示未在编辑
+const tags = ['编程', 'PS设计', '绘图', '文案']
+const role = ref('published')
+const orders = ref([])
+const loadingOrders = ref(false)
+const editVisible = ref(false)
 const editingId = ref(null)
-// 响应式状态：编辑表单对象，包含标题 / 描述 / 截止日期三个字段
-const editForm = ref({ title: '', description: '', due_date: '' })
+const editDraft = ref({ title: '', description: '', tag: '编程', deadline: '' })
 
-// 点标题 → 进入编辑，把现有数据填进表单
-function startEdit(task) {
-  // 记录正在编辑的任务 id
-  editingId.value = task.id
-  // 用任务现有数据填充编辑表单
-  editForm.value = {
-    // 填标题字段
-    title: task.title,
-    // 填描述字段，无描述时用空字符串兜底
-    description: task.description || '',
-    // 填截止日期字段，无日期时用空字符串兜底
-    due_date: task.due_date || '',
+async function loadOrders() {
+  loadingOrders.value = true
+  try {
+    const response = await getMyOrders(role.value)
+    orders.value = response.data
+  } catch {
+    orders.value = []
+  } finally {
+    loadingOrders.value = false
   }
 }
 
-// 取消编辑：清空编辑中的任务 id，隐藏编辑区
-function cancelEdit() {
-  editingId.value = null
+function statusClass(status) {
+  if (status === '已接单') return 'status-taken'
+  if (status === '已关闭') return 'status-closed'
+  return 'status-open'
 }
 
-// 保存
-// 异步保存函数：更新当前编辑的任务
-async function saveEdit(task) {
-  // 取编辑表单的当前值
-  const form = editForm.value
-  // 标题不能为空：去除首尾空格后为空则直接返回，不保存
-  if (!form.title.trim()) return
-  // 组装提交给接口的数据对象
-  const data = {
-    // 提交标题：去除首尾空格
-    title: form.title.trim(),
-    // 提交描述：原样传递
-    description: form.description,
-    // 提交截止日期：空字符串转成 null，符合接口要求
-    due_date: form.due_date || null,
+function openEdit(order) {
+  editingId.value = order.id
+  editDraft.value = {
+    title: order.title,
+    description: order.description,
+    tag: order.tag,
+    deadline: order.deadline || '',
   }
-  try{
-    // 调用接口更新任务，等待返回更新后的数据
-    const res = await request(() => updateTask(task.id, data), { successMsg: '保存成功' })
-    // 在任务列表中查找该任务的下标
-    const index = tasks.value.findIndex(t => t.id === task.id)
-    // 用接口返回的最新数据替换列表中的旧数据
-    tasks.value[index] = res.data
-    // 保存成功退出编辑模式
-    editingId.value = null
-  }catch{}
+  editVisible.value = true
 }
 
-// ===== 列表 / 增删改 =====
-// 异步切换筛选函数：根据筛选值重新加载任务列表
-async function switchFilter(value) {
-  // 更新当前筛选值，驱动按钮高亮
-  currentFilter.value = value
-  // 调用接口拉取数据：筛选值为 all 时不传参（查询全部），否则传筛选值
-  const res = await getTasks(value === 'all' ? undefined : value)
-  // 用接口返回的数据覆盖任务列表
-  tasks.value = res.data
+async function saveEdit() {
+  if (!editingId.value || !editDraft.value.title.trim() || !editDraft.value.description.trim()) return
+  try {
+    await updateOrder(editingId.value, {
+      title: editDraft.value.title.trim(),
+      description: editDraft.value.description.trim(),
+      tag: editDraft.value.tag,
+      deadline: editDraft.value.deadline || null,
+    })
+    editVisible.value = false
+    showToast('订单已更新', 'success')
+    await loadOrders()
+  } catch {}
 }
 
-// 异步加载任务函数：无筛选条件地拉取全部任务
-async function loadTasks() {
-  // 调用接口获取全部任务列表
-  const res = await request(() => getTasks())
-  // 用接口返回的数据覆盖任务列表
-  tasks.value = res.data
+async function close(order) {
+  if (!window.confirm(`确定关闭「${order.title}」吗？`)) return
+  try {
+    await closeOrder(order.id)
+    showToast('订单已关闭', 'success')
+    await loadOrders()
+  } catch {}
 }
 
-// 异步添加任务函数
-async function addTask() {
-  // 取输入标题并去除首尾空格
-  const title = newTitle.value.trim()
-  // 标题为空则直接返回，不调用接口
-  if (!title) return
-  // 组装新增任务的数据对象
-  const data = {
-    // 新增标题
-    title,
-    // 新增描述
-    description: newDesc.value,
-  }
-  // 若选择了截止日期则追加到数据对象中
-  if (newDue.value) data.due_date = newDue.value
-  try
-  {
-    // 调用接口创建任务，等待返回新任务数据
-    const res = await request(() => createTask(data), { successMsg: '添加成功' })
-    // 将新任务插入到列表头部（最新在最上）
-    tasks.value.unshift(res.data)
-    // 清空标题输入框
-    newTitle.value = ''
-    // 清空描述输入框
-    newDesc.value = ''
-    // 清空截止日期输入框
-    newDue.value = ''
-  }catch {}
+async function abandon(order) {
+  try {
+    await requestAbandon(order.id)
+    showToast('放弃申请已提交', 'success')
+    await loadOrders()
+  } catch {}
 }
 
-// 异步切换任务完成状态函数
-async function toggleTask(task) {
-  try{
-    // 调用接口：传入任务 id 与取反后的完成状态
-    const res = await request(()=>updateTask(task.id),{ completed: !task.completed })
-    // 在任务列表中查找该任务的下标
-    const index = tasks.value.findIndex(t => t.id === task.id)
-    // 用接口返回的最新数据替换列表中的旧数据
-    tasks.value[index] = res.data
-  }catch{}
+async function decide(order, decision) {
+  try {
+    await decideAbandon(order.id, decision)
+    showToast(decision === 'agree' ? '已同意放弃，订单重新开放' : '已拒绝放弃申请', 'success')
+    await loadOrders()
+  } catch {}
 }
 
-// 异步删除任务函数
-async function removeTask(task) {
-  try{
-    // 调用接口删除该任务
-    await request(() => deleteTask(task.id), { successMsg: '已删除' })
-    // 从本地列表中过滤掉已删除的任务
-    tasks.value = tasks.value.filter(t => t.id !== task.id)
-  }catch{}
-}
-
-function logout() {
-  localStorage.removeItem('token')
-  location.href = '/login'
-}
-
-
-// 组件挂载完成后自动加载任务列表
-onMounted(loadTasks)
+watch(role, loadOrders)
+onMounted(loadOrders)
 </script>
-
-<style scoped>
-.tasks {
-  max-width: 640px;
-  margin: 40px auto;
-  padding: 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-}
-
-.page-title {
-  margin: 0 0 24px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.add-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.add-bar .el-input {
-  flex: 1;
-  min-width: 180px;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-li {
-  padding: 16px;
-  margin-bottom: 12px;
-  background: #fafafa;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
-  transition: all 0.3s ease;
-}
-
-li:hover {
-  background: #f5f7fa;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.title {
-  flex: 1;
-  cursor: pointer;
-  font-size: 15px;
-  color: #303133;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: color 0.2s;
-}
-
-.title:hover {
-  color: #409eff;
-}
-
-.done .title {
-  text-decoration: line-through;
-  color: #909399;
-  opacity: 0.7;
-}
-
-.done {
-  background: #f9f9f9;
-  opacity: 0.8;
-}
-
-.edit-box {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.edit-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.8;
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 500;
-  color: #606266;
-  margin-bottom: 8px;
-}
-
-.empty-desc {
-  font-size: 14px;
-  color: #909399;
-}
-
-/* 列表动画 */
-.task-list-enter-active,
-.task-list-leave-active {
-  transition: all 0.4s ease;
-}
-
-.task-list-enter-from {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-.task-list-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.task-list-move {
-  transition: transform 0.3s ease;
-}
-
-/* 完成任务动效 */
-li.done .title {
-  position: relative;
-}
-
-li.done .title::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 100%;
-  height: 1px;
-  background: #909399;
-  animation: strikethrough 0.3s ease forwards;
-}
-
-@keyframes strikethrough {
-  from {
-    width: 0;
-  }
-  to {
-    width: 100%;
-  }
-}
-</style>
