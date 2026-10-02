@@ -26,7 +26,7 @@ class Order(Base):
     abandon_request_time = Column(DateTime)
     publisher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     taker_id = Column(Integer, ForeignKey("users.id"))
-    create_time = Column(DateTime, default=datetime.utcnow)
+    create_time = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     publisher = relationship("User", foreign_keys=[publisher_id])
