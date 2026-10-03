@@ -23,3 +23,6 @@ frontend/yarn-error.log*
 .vscode/
 *.swp
 *.swo
+
+# 打包产物
+/app.tar.gz
