@@ -59,3 +59,6 @@ export const login = (username, password) => {
     const form = new URLSearchParams({ username, password })
     return api.post('/login', form)
 }
+
+export const getMyProfile = () => api.get('/users/me')
+export const updateMyProfile = (data) => api.patch('/users/me', data)

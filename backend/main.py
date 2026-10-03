@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from database import engine, Base
 from router.orders import router as orders_router
 from router.auth import router as auth_router
+from router.users import router as users_router
 # 生命周期管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,6 +44,7 @@ def health():
 
 app.include_router(orders_router)
 app.include_router(auth_router)
+app.include_router(users_router)
 app.include_router(router)
 
 #运行 uvicorn backend.main:app --reload

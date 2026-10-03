@@ -35,6 +35,8 @@ uv run --group dev python -m pytest -q
 | GET | `/api/health` | 否 | 健康检查 |
 | POST | `/api/register` | 否 | 注册并签发访问令牌 |
 | POST | `/api/login` | 否 | 登录并签发访问令牌 |
+| GET | `/api/users/me` | 是 | 查看我的联系方式资料 |
+| PATCH | `/api/users/me` | 是 | 更新我的微信/手机号 |
 | POST | `/api/orders` | 是 | 发布订单 |
 | GET | `/api/orders` | 是 | 订单大厅，可按标签筛选 |
 | GET | `/api/orders/mine` | 是 | 查看我发布或接取的订单 |
@@ -87,6 +89,40 @@ curl.exe -X POST http://127.0.0.1:8000/api/login `
 ```text
 Authorization: Bearer <JWT>
 ```
+
+## 个人联系方式
+
+微信和手机号均为选填，注册时不需要提供；用户随时可通过以下接口维护。联系方式**不会出现在订单大厅**，仅在订单状态为 `已接单` 时，随订单详情的 `contact` 字段向该订单的对方公开（见订单响应字段说明）。
+
+### 查看我的资料
+
+`GET /api/users/me`
+
+```json
+{
+	"username": "alice",
+	"wechat": "alice_design",
+	"phone": "13800138000"
+}
+```
+
+未填写的字段返回 `null`。
+
+### 更新微信/手机号
+
+`PATCH /api/users/me`
+
+```json
+{
+	"wechat": "alice_design",
+	"phone": "13800138000"
+}
+```
+
+- 两个字段都可省略；传入空字符串表示清空该字段。
+- `wechat`：需以字母开头，为 6-20 位字母、数字、下划线或减号。
+- `phone`：11 位大陆手机号（`1[3-9]` 开头）。
+- 格式不正确返回 `400`，响应示例：`{"detail": "请输入正确的 11 位大陆手机号"}`。
 
 ## 订单
 
