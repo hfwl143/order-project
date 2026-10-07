@@ -1,0 +1,41 @@
+# 服务器实际运行版本（/root/app/docker-compose.yml）
+# 架构：db + frontend 跑容器，backend 由 systemd 在宿主机裸跑（见 backend.service）
+services:
+  db:
+    image: mysql:8.0
+    command:
+      - --innodb_buffer_pool_size=128M
+      - --max_connections=50
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: task_db
+    # 仅绑定回环地址：供宿主机裸跑的 backend 经 127.0.0.1:3306 连接，不对公网暴露
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      # 仅数据卷为空（首次启动）时自动执行一次
+      - ./data.sql:/docker-entrypoint-initdb.d/data.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    # Linux 下让容器把 host.docker.internal 解析到宿主机网关，回连 systemd 管理的 backend:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  mysqldata: {}
