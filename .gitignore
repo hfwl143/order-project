@@ -26,3 +26,32 @@ frontend/yarn-error.log*
 
 # 打包产物
 /app.tar.gz
+# ===== 环境变量文件（防止误提交密钥）=====
+.env
+.env.*
+!.env.example
+backend.env
+
+# ===== 数据库备份（含真实数据，禁止入库）=====
+backup_*.sql
+*.dump
+mysqldump*
+*.sql.bak
+
+# ===== 所有打包产物 =====
+*.tar.gz
+*.tar
+dist.tar.gz
+app.tar.gz
+
+# ===== 运行时文件 =====
+*.pid
+*.sock
+*.log
+
+# ===== 临时文件 =====
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
